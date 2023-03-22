@@ -211,7 +211,7 @@ resource "azurerm_resource_group_template_deployment" "private_dns_zone_group_te
       value = "customdns"
     },
     "privateEndpointName" = {
-      value = "${azurerm_redis_cache.redis_cache.name}-pep-1"
+      value = azurerm_private_endpoint.private_endpoint.name
     },
     "privateDnsZoneResourceIds" = {
       value = [for private_dns_zone in data.azurerm_private_dns_zone.private_dns_zones : private_dns_zone.id]
