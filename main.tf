@@ -1,4 +1,5 @@
 resource "azurerm_storage_account" "storage" {
+  count                           = var.storage_account_name != null ? 1 : 0
   name                            = var.storage_account_name
   location                        = var.location
   resource_group_name             = var.resource_group_name
@@ -34,7 +35,8 @@ resource "azurerm_storage_account" "storage" {
 }
 
 resource "azurerm_storage_account_network_rules" "rules" {
-  storage_account_id         = azurerm_storage_account.storage.id
+  count                      = var.storage_account_name != null ? 1 : 0
+  storage_account_id         = azurerm_storage_account.storage[0].id
   default_action             = var.storage_account_network_rules.default_action
   ip_rules                   = var.storage_account_network_rules.ip_rules
   virtual_network_subnet_ids = var.storage_account_network_rules.virtual_network_subnet_ids
@@ -42,8 +44,9 @@ resource "azurerm_storage_account_network_rules" "rules" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "storage_account_diagnostics" {
+  count                      = var.storage_account_name != null ? 1 : 0
   name                       = "${var.log_analytics_workspace_name}-security-logging"
-  target_resource_id         = azurerm_storage_account.storage.id
+  target_resource_id         = azurerm_storage_account.storage[0].id
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.logs.id
 
   metric {
@@ -67,9 +70,9 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_diagnostics" {
 }
 
 resource "azurerm_monitor_diagnostic_setting" "storage_account_blob_diagnostics" {
-  for_each                   = toset(["blobServices", "fileServices", "tableServices", "queueServices"])
+  for_each                   = var.storage_account_name != null ? toset(["blobServices", "fileServices", "tableServices", "queueServices"]) : toset([])
   name                       = "${var.log_analytics_workspace_name}-security-logging"
-  target_resource_id         = "${azurerm_storage_account.storage.id}/${each.key}/default/"
+  target_resource_id         = "${azurerm_storage_account.storage[0].id}/${each.key}/default/"
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.logs.id
 
   enabled_log {
@@ -117,6 +120,10 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_blob_diagnostics"
       enabled = false
     }
   }
+
+  depends_on = [
+    azurerm_storage_account.storage
+  ]
 }
 
 resource "azurerm_redis_cache" "redis_cache" {
@@ -144,14 +151,17 @@ resource "azurerm_redis_cache" "redis_cache" {
 
   redis_configuration {
     aof_backup_enabled              = var.aof_backup_enabled
+    aof_storage_connection_string_0 = var.aof_backup_enabled == true && var.storage_account_name != null ? "DefaultEndpointsProtocol=https;BlobEndpoint=${azurerm_storage_account.storage[0].primary_blob_endpoint};AccountName=${azurerm_storage_account.storage[0].name};AccountKey=${azurerm_storage_account.storage[0].primary_access_key}" : null
+    aof_storage_connection_string_1 = var.aof_backup_enabled == true && var.storage_account_name != null ? "DefaultEndpointsProtocol=https;BlobEndpoint=${azurerm_storage_account.storage[0].primary_blob_endpoint};AccountName=${azurerm_storage_account.storage[0].name};AccountKey=${azurerm_storage_account.storage[0].secondary_access_key}" : null
     enable_authentication           = true
     maxmemory_reserved              = var.maxmemory_reserved
     maxmemory_delta                 = var.maxmemory_delta
     maxmemory_policy                = var.maxmemory_policy
     maxfragmentationmemory_reserved = var.maxfragmentationmemory_reserved
     rdb_backup_enabled              = var.rdb_backup_enabled
-    rdb_backup_frequency            = var.rdb_backup_frequency
-    rdb_backup_max_snapshot_count   = var.rdb_backup_max_snapshot_count
+    rdb_backup_frequency            = var.rdb_backup_enabled == true ? 15 : null
+    rdb_backup_max_snapshot_count   = var.rdb_backup_enabled == true ? 1 : null
+    rdb_storage_connection_string   = var.rdb_backup_enabled == true && var.storage_account_name != null ? "DefaultEndpointsProtocol=https;BlobEndpoint=${azurerm_storage_account.storage[0].primary_blob_endpoint};AccountName=${azurerm_storage_account.storage[0].name};AccountKey=${azurerm_storage_account.storage[0].primary_access_key}" : null
     notify_keyspace_events          = var.notify_keyspace_events
   }
 
@@ -161,11 +171,12 @@ resource "azurerm_redis_cache" "redis_cache" {
     maintenance_window = var.maintenance_window
   }
 
+  lifecycle {
+    ignore_changes = [
+      redis_configuration[0].rdb_storage_connection_string
+    ]
+  }
   tags = var.tags
-
-  depends_on = [
-    azurerm_storage_account.storage
-  ]
 }
 
 resource "azurerm_redis_firewall_rule" "redis_firewall" {
@@ -175,6 +186,38 @@ resource "azurerm_redis_firewall_rule" "redis_firewall" {
   resource_group_name = var.resource_group_name
   start_ip            = each.value["start_ip"]
   end_ip              = each.value["end_ip"]
+}
+
+resource "azurerm_private_endpoint" "private_endpoint" {
+  name                = "${azurerm_redis_cache.redis_cache.name}-pep-1"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  subnet_id           = data.azurerm_subnet.subnet.id
+
+  private_service_connection {
+    name                           = "${azurerm_redis_cache.redis_cache.name}-psc-1"
+    private_connection_resource_id = azurerm_redis_cache.redis_cache.id
+    is_manual_connection           = false
+    subresource_names              = ["redisCache"]
+  }
+}
+
+resource "azurerm_resource_group_template_deployment" "private_dns_zone_group_template" {
+  name                = "${azurerm_redis_cache.redis_cache.name}-customdns"
+  resource_group_name = var.resource_group_name
+  template_content    = file("arm/privateDnsZoneGroup.json")
+  parameters_content = jsonencode({
+    "privateDnsZoneGroupName" = {
+      value = "customdns"
+    },
+    "privateEndpointName" = {
+      value = "${azurerm_redis_cache.redis_cache.name}-pep-1"
+    },
+    "privateDnsZoneResourceIds" = {
+      value = [for private_dns_zone in data.azurerm_private_dns_zone.private_dns_zones : private_dns_zone.id]
+    }
+  })
+  deployment_mode = "Incremental"
 }
 
 resource "azurerm_monitor_diagnostic_setting" "redis_cache_diagnostics" {

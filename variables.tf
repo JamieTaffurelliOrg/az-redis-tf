@@ -30,6 +30,7 @@ variable "sku_name" {
 
 variable "private_static_ip_address" {
   type        = string
+  default     = null
   description = "The Static IP Address to assign to the Redis Cache when hosted inside the Virtual Network. This argument implies the use of subnet_id."
 }
 
@@ -41,11 +42,13 @@ variable "public_network_access_enabled" {
 
 variable "replicas_per_master" {
   type        = number
+  default     = null
   description = "Amount of replicas to create per master for this Redis Cache."
 }
 
 variable "replicas_per_primary" {
   type        = number
+  default     = null
   description = "Amount of replicas to create per primary for this Redis Cache. If both replicas_per_primary and replicas_per_master are set, they need to be equal."
 }
 
@@ -57,17 +60,19 @@ variable "redis_version" {
 
 variable "shard_count" {
   type        = number
+  default     = null
   description = "The number of Shards to create on the Redis Cluster"
 }
 
 variable "subnet_id" {
   type        = string
+  default     = null
   description = "The ID of the Subnet within which the Redis Cache should be deployed."
 }
 
 variable "zones" {
   type        = list(string)
-  default     = []
+  default     = null
   description = "Availability zone to deploy Redis nodes to"
 }
 
@@ -79,11 +84,13 @@ variable "aof_backup_enabled" {
 
 variable "maxmemory_reserved" {
   type        = number
+  default     = null
   description = "Value in megabytes reserved for non-cache usage e.g. failover."
 }
 
 variable "maxmemory_delta" {
   type        = number
+  default     = null
   description = "The max-memory delta for this Redis instance."
 }
 
@@ -95,6 +102,7 @@ variable "maxmemory_policy" {
 
 variable "maxfragmentationmemory_reserved" {
   type        = number
+  default     = null
   description = "Value in megabytes reserved to accommodate for memory fragmentation."
 }
 
@@ -104,19 +112,9 @@ variable "rdb_backup_enabled" {
   description = "Enable Redis backups"
 }
 
-variable "rdb_backup_frequency" {
-  type        = number
-  description = "The Backup Frequency in Minutes. Only supported on Premium SKUs. Possible values are: 15, 30, 60, 360, 720 and 1440."
-}
-
-variable "rdb_backup_max_snapshot_count" {
-  type        = number
-  description = "The maximum number of snapshots to create as a backup."
-}
-
 variable "notify_keyspace_events" {
-  type        = bool
-  default     = false
+  type        = string
+  default     = null
   description = "Enable keysapce notifications"
 }
 
@@ -150,6 +148,7 @@ variable "redis_firewall_rules" {
 
 variable "storage_account_name" {
   type        = string
+  default     = null
   description = "The name of the storage account to store Redis backups"
 }
 
@@ -163,6 +162,29 @@ variable "storage_account_network_rules" {
   )
   default     = {}
   description = "The Storage Account firewall rules"
+}
+
+variable "subnet_name" {
+  type        = string
+  description = "The name of the resource group of the subnet to deploy private endpoint"
+}
+
+variable "virtual_network_name" {
+  type        = string
+  description = "The name of the resource group of the subnet to deploy private endpoint"
+}
+
+variable "subnet_resource_group_name" {
+  type        = string
+  description = "The name of the resource group of the subnet to deploy private endpoint"
+}
+
+variable "private_dns_zones" {
+  type = list(object({
+    name                = string
+    resource_group_name = string
+  }))
+  description = "Private DNS zones to link to Redis Private Endpoint"
 }
 
 variable "log_analytics_workspace_name" {
