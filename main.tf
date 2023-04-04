@@ -1,4 +1,9 @@
 resource "azurerm_storage_account" "storage" {
+  #checkov:skip=CKV2_AZURE_33:This is an old way of logging, diagnostics are enabled
+  #checkov:skip=CKV_AZURE_33:This is an old way of logging, diagnostics are enabled
+  #checkov:skip=CKV2_AZURE_18:This is unnecessary for most scenarios
+  #checkov:skip=CKV2_AZURE_1:We may require some storage accounts to not have firewalls
+  #checkov:skip=CKV_AZURE_59:Value is deprecated
   count                           = var.storage_account_name != null ? 1 : 0
   name                            = var.storage_account_name
   location                        = var.location
@@ -35,6 +40,7 @@ resource "azurerm_storage_account" "storage" {
 }
 
 resource "azurerm_storage_account_network_rules" "rules" {
+  #checkov:skip=CKV_AZURE_35:We may require these storage accounts to be publicly accessible
   count                      = var.storage_account_name != null ? 1 : 0
   storage_account_id         = azurerm_storage_account.storage[0].id
   default_action             = var.storage_account_network_rules.default_action
@@ -75,7 +81,7 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_blob_diagnostics"
   target_resource_id         = "${azurerm_storage_account.storage[0].id}/${each.key}/default/"
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.logs.id
 
-  enabled_log {
+  log {
     category = "StorageRead"
 
     retention_policy {
@@ -84,7 +90,7 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_blob_diagnostics"
     }
   }
 
-  enabled_log {
+  log {
     category = "StorageWrite"
 
     retention_policy {
@@ -93,7 +99,7 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_blob_diagnostics"
     }
   }
 
-  enabled_log {
+  log {
     category = "StorageDelete"
 
     retention_policy {
@@ -225,7 +231,7 @@ resource "azurerm_monitor_diagnostic_setting" "redis_cache_diagnostics" {
   target_resource_id         = azurerm_redis_cache.redis_cache.id
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.logs.id
 
-  enabled_log {
+  log {
     category = "ConnectedClientList"
 
     retention_policy {
