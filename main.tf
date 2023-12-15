@@ -57,11 +57,6 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_diagnostics" {
 
   metric {
     category = "Transaction"
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 
   metric {
@@ -81,40 +76,20 @@ resource "azurerm_monitor_diagnostic_setting" "storage_account_blob_diagnostics"
   target_resource_id         = "${azurerm_storage_account.storage[0].id}/${each.key}/default/"
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.logs.id
 
-  log {
+  enabled_log {
     category = "StorageRead"
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 
-  log {
+  enabled_log {
     category = "StorageWrite"
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 
-  log {
+  enabled_log {
     category = "StorageDelete"
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 
   metric {
     category = "Transaction"
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 
   metric {
@@ -231,22 +206,12 @@ resource "azurerm_monitor_diagnostic_setting" "redis_cache_diagnostics" {
   target_resource_id         = azurerm_redis_cache.redis_cache.id
   log_analytics_workspace_id = data.azurerm_log_analytics_workspace.logs.id
 
-  log {
+  enabled_log {
     category = "ConnectedClientList"
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 
   metric {
     category = "AllMetrics"
     enabled  = true
-
-    retention_policy {
-      enabled = true
-      days    = 365
-    }
   }
 }
